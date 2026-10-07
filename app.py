@@ -1177,6 +1177,350 @@ else:
 
 
 # ============================================================
+# CALIDAD Y COBERTURA DOCUMENTAL
+# ============================================================
+
+st.divider()
+
+st.subheader(
+    "Calidad y cobertura documental"
+)
+
+
+# Relación entre el nombre visible del indicador
+# y la condición que debe cumplir cada proyecto.
+condiciones_cobertura = {
+    "Estudiantes": (
+        datos_filtrados["Estudiantes"].notna()
+    ),
+    "Beneficiarios": (
+        datos_filtrados[
+            "Beneficiarios_Valor"
+        ].notna()
+    ),
+    "Coordenadas": (
+        datos_filtrados["Latitud"].notna()
+        & datos_filtrados["Longitud"].notna()
+    ),
+    "Producto técnico": (
+        datos_filtrados[
+            "Producto_Principal"
+        ].notna()
+    ),
+    "Entidad beneficiaria": (
+        datos_filtrados[
+            "Entidad_Beneficiaria"
+        ].notna()
+    ),
+}
+
+
+# Añadir publicación asociada si la columna existe.
+if "Publicacion_Asociada" in datos_filtrados.columns:
+    condiciones_cobertura[
+        "Publicación asociada"
+    ] = (
+        pd.to_numeric(
+            datos_filtrados[
+                "Publicacion_Asociada"
+            ],
+            errors="coerce",
+        )
+        .fillna(0)
+        .eq(1)
+    )
+
+
+# Añadir madurez preliminar si la columna existe.
+if (
+    "Nivel_Madurez_Preliminar"
+    in datos_filtrados.columns
+):
+    condiciones_cobertura[
+        "Madurez preliminar"
+    ] = (
+        datos_filtrados[
+            "Nivel_Madurez_Preliminar"
+        ].notna()
+    )
+
+
+# Añadir fuente primaria si la columna existe.
+if "Fuente_Primaria" in datos_filtrados.columns:
+    condiciones_cobertura[
+        "Fuente primaria"
+    ] = (
+        datos_filtrados[
+            "Fuente_Primaria"
+        ].notna()
+        & (
+            datos_filtrados[
+                "Fuente_Primaria"
+            ]
+            .astype(str)
+            .str.strip()
+            != ""
+        )
+    )
+
+
+# Construir la tabla resumen.
+registros_cobertura = []
+
+for indicador, condicion in condiciones_cobertura.items():
+    proyectos_con_dato = int(
+        condicion.fillna(False).sum()
+    )
+
+    proyectos_sin_dato = (
+        total_proyectos
+        - proyectos_con_dato
+    )
+
+    porcentaje_cobertura = (
+        proyectos_con_dato
+        / total_proyectos
+        * 100
+        if total_proyectos > 0
+        else 0
+    )
+
+    registros_cobertura.append(
+        {
+            "Indicador": indicador,
+            "Con_Dato": proyectos_con_dato,
+            "Sin_Dato": proyectos_sin_dato,
+            "Cobertura": porcentaje_cobertura,
+        }
+    )
+
+
+resumen_cobertura = pd.DataFrame(
+    registros_cobertura
+)
+
+
+# ============================================================
+# INDICADORES RESUMIDOS DE CALIDAD
+# ============================================================
+
+cobertura_promedio = (
+    resumen_cobertura[
+        "Cobertura"
+    ].mean()
+)
+
+
+proyectos_con_coordenadas = int(
+    condiciones_cobertura[
+        "Coordenadas"
+    ]
+    .fillna(False)
+    .sum()
+)
+
+
+proyectos_con_estudiantes = int(
+    condiciones_cobertura[
+        "Estudiantes"
+    ]
+    .fillna(False)
+    .sum()
+)
+
+
+proyectos_con_dato_social = int(
+    condiciones_cobertura[
+        "Beneficiarios"
+    ]
+    .fillna(False)
+    .sum()
+)
+
+
+calidad_1, calidad_2, calidad_3, calidad_4 = (
+    st.columns(4)
+)
+
+
+with calidad_1:
+    st.metric(
+        label="Cobertura documental media",
+        value=f"{cobertura_promedio:.1f}%",
+    )
+
+
+with calidad_2:
+    st.metric(
+        label="Con estudiantes",
+        value=(
+            f"{proyectos_con_estudiantes} "
+            f"de {total_proyectos}"
+        ),
+    )
+
+
+with calidad_3:
+    st.metric(
+        label="Con dato social",
+        value=(
+            f"{proyectos_con_dato_social} "
+            f"de {total_proyectos}"
+        ),
+    )
+
+
+with calidad_4:
+    st.metric(
+        label="Con coordenadas",
+        value=(
+            f"{proyectos_con_coordenadas} "
+            f"de {total_proyectos}"
+        ),
+    )
+
+
+# ============================================================
+# GRÁFICO DE COBERTURA
+# ============================================================
+
+resumen_cobertura_grafico = (
+    resumen_cobertura.sort_values(
+        by="Cobertura",
+        ascending=True,
+    )
+)
+
+
+figura_cobertura = px.bar(
+    resumen_cobertura_grafico,
+    x="Cobertura",
+    y="Indicador",
+    orientation="h",
+    text="Cobertura",
+    title=(
+        "Cobertura de información "
+        "por variable"
+    ),
+    labels={
+        "Cobertura": "Cobertura documental (%)",
+        "Indicador": "",
+    },
+    color="Cobertura",
+    color_continuous_scale=[
+        "#FDE2E2",
+        "#F9C74F",
+        "#0B7285",
+    ],
+    range_color=[
+        0,
+        100,
+    ],
+    hover_data={
+        "Con_Dato": True,
+        "Sin_Dato": True,
+        "Cobertura": ":.1f",
+    },
+)
+
+
+figura_cobertura.update_traces(
+    texttemplate="%{text:.1f}%",
+    textposition="outside",
+)
+
+
+figura_cobertura.update_layout(
+    xaxis_title="Cobertura documental (%)",
+    yaxis_title="",
+    height=max(
+        450,
+        len(resumen_cobertura_grafico)
+        * 55,
+    ),
+    coloraxis_colorbar={
+        "title": "Cobertura",
+        "ticksuffix": "%",
+    },
+    margin={
+        "l": 20,
+        "r": 80,
+        "t": 70,
+        "b": 20,
+    },
+)
+
+
+figura_cobertura.update_xaxes(
+    range=[
+        0,
+        105,
+    ],
+    ticksuffix="%",
+)
+
+
+st.plotly_chart(
+    figura_cobertura,
+    use_container_width=True,
+)
+
+
+# ============================================================
+# TABLA DE DATOS FALTANTES
+# ============================================================
+
+st.markdown(
+    "#### Resumen de disponibilidad"
+)
+
+
+tabla_cobertura = (
+    resumen_cobertura[
+        [
+            "Indicador",
+            "Con_Dato",
+            "Sin_Dato",
+            "Cobertura",
+        ]
+    ]
+    .copy()
+)
+
+
+st.dataframe(
+    tabla_cobertura,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Indicador": st.column_config.TextColumn(
+            "Variable"
+        ),
+        "Con_Dato": st.column_config.NumberColumn(
+            "Proyectos con dato",
+            format="%d",
+        ),
+        "Sin_Dato": st.column_config.NumberColumn(
+            "Proyectos sin dato",
+            format="%d",
+        ),
+        "Cobertura": st.column_config.ProgressColumn(
+            "Cobertura",
+            min_value=0,
+            max_value=100,
+            format="%.1f%%",
+        ),
+    },
+)
+
+
+st.caption(
+    "La cobertura indica disponibilidad documental. "
+    "No representa calidad técnica, ejecución física "
+    "ni impacto causal del proyecto."
+)
+
+# ============================================================
 # GRÁFICO POR PERÍODO ACADÉMICO
 # ============================================================
 
