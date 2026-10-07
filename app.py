@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+
 # CONFIGURACIÓN GENERAL
 
 st.set_page_config(
@@ -12,7 +13,9 @@ st.set_page_config(
     layout="wide",
 )
 
+
 # FUNCIONES AUXILIARES
+
 
 def mostrar_valor(valor):
     """
@@ -35,9 +38,24 @@ def mostrar_valor(valor):
 
     return texto
 
+
+def formatear_entero(valor):
+    """
+    Presenta números enteros con punto como separador
+    de miles. Devuelve "-" cuando no existe información.
+    """
+
+    if pd.isna(valor):
+        return "-"
+
+    return f"{int(valor):,}".replace(",", ".")
+
+
 # RUTA DE LA BASE DE DATOS
 
+
 RUTA_EXCEL = Path("data") / "base_datos_rc.xlsx"
+
 
 # ENCABEZADO
 
@@ -50,6 +68,7 @@ st.caption(
     "Universidad Técnica de Cotopaxi"
 )
 
+
 # COMPROBACIÓN DEL ARCHIVO
 
 if not RUTA_EXCEL.exists():
@@ -59,12 +78,13 @@ if not RUTA_EXCEL.exists():
     )
 
     st.info(
-        "Compruebe que el archivo se encuentre dentro "
+        "Comprueba que el archivo se encuentre dentro "
         "de la carpeta `data` y que el nombre coincida "
         "exactamente."
     )
 
     st.stop()
+
 
 # CARGA DE LA BASE
 
@@ -88,6 +108,7 @@ except Exception as error:
     )
     st.exception(error)
     st.stop()
+
 
 # VALIDACIÓN DE COLUMNAS
 
