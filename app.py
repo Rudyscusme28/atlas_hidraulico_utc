@@ -398,6 +398,133 @@ st.caption(
     "no se suman entre sí."
 )
 
+# GRÁFICO DE BENEFICIARIOS POR PROYECTO
+
+st.markdown(
+    "#### Beneficiarios por proyecto"
+)
+
+
+# Obtener únicamente las unidades disponibles
+# dentro de la selección activa
+unidades_sociales = sorted(
+    datos_filtrados.loc[
+        datos_filtrados["Beneficiarios_Valor"].notna()
+        & datos_filtrados["Beneficiarios_Unidad"].notna(),
+        "Beneficiarios_Unidad",
+    ]
+    .astype(str)
+    .unique()
+    .tolist()
+)
+
+
+if not unidades_sociales:
+    st.info(
+        "Los proyectos seleccionados no tienen "
+        "beneficiarios cuantificados."
+    )
+
+else:
+    # Seleccionar una sola unidad para evitar
+    # comparaciones entre magnitudes incompatibles
+    unidad_seleccionada = st.selectbox(
+        label="Unidad de beneficiarios",
+        options=unidades_sociales,
+        key="selector_unidad_beneficiarios",
+    )
+
+
+    # Filtrar proyectos con la unidad seleccionada
+    datos_beneficiarios = datos_filtrados.loc[
+        (
+            datos_filtrados["Beneficiarios_Unidad"]
+            == unidad_seleccionada
+        )
+        & datos_filtrados[
+            "Beneficiarios_Valor"
+        ].notna()
+    ].copy()
+
+
+    # Ordenar los proyectos por cantidad
+    datos_beneficiarios = (
+        datos_beneficiarios.sort_values(
+            by="Beneficiarios_Valor",
+            ascending=True,
+        )
+    )
+
+
+    if datos_beneficiarios.empty:
+        st.info(
+            "No existen proyectos con valores "
+            "documentados para esta unidad."
+        )
+
+    else:
+        figura_beneficiarios = px.bar(
+            datos_beneficiarios,
+            x="Beneficiarios_Valor",
+            y="Nombre_Proyecto",
+            orientation="h",
+            color="Linea_Tematica",
+            text="Beneficiarios_Valor",
+            title=(
+                "Beneficiarios documentados por proyecto "
+                f"({unidad_seleccionada})"
+            ),
+            labels={
+                "Beneficiarios_Valor": (
+                    unidad_seleccionada
+                ),
+                "Nombre_Proyecto": "Proyecto",
+                "Linea_Tematica": "Línea temática",
+            },
+            hover_data={
+                "ID_Proyecto": True,
+                "Periodo_Academico": True,
+                "Comunidad": True,
+                "Beneficiarios_Unidad": True,
+            },
+        )
+
+
+        figura_beneficiarios.update_traces(
+            texttemplate="%{text:,.0f}",
+            textposition="outside",
+        )
+
+
+        figura_beneficiarios.update_layout(
+            xaxis_title=unidad_seleccionada,
+            yaxis_title="",
+            legend_title_text="Línea temática",
+            height=max(
+                400,
+                len(datos_beneficiarios) * 55,
+            ),
+            margin={
+                "l": 20,
+                "r": 80,
+                "t": 70,
+                "b": 20,
+            },
+        )
+
+
+        st.plotly_chart(
+            figura_beneficiarios,
+            use_container_width=True,
+        )
+
+
+        st.caption(
+            "El gráfico presenta únicamente proyectos "
+            f"expresados en {unidad_seleccionada}. "
+            "Los datos ausentes no se consideran cero."
+        )
+
 # GRÁFICO POR PERÍODO ACADÉMICO
 
 proyectos_por_periodo = (
