@@ -105,10 +105,23 @@ try:
         engine="openpyxl",
     )
 
+    publicaciones = pd.read_excel(
+        RUTA_EXCEL,
+        sheet_name="TB_PUBLICACIONES",
+        engine="openpyxl",
+    )
+
+    relaciones_publicaciones = pd.read_excel(
+        RUTA_EXCEL,
+        sheet_name="TB_PROYECTO_PUBLICACION",
+        engine="openpyxl",
+    )
+
 except ValueError:
     st.error(
-        "No se encontró la hoja `TB_PROYECTOS` "
-        "dentro del archivo Excel."
+        "No se encontraron todas las hojas requeridas: "
+        "`TB_PROYECTOS`, `TB_PUBLICACIONES` o "
+        "`TB_PROYECTO_PUBLICACION`."
     )
     st.stop()
 
@@ -118,6 +131,7 @@ except Exception as error:
     )
     st.exception(error)
     st.stop()
+
 
 
 # ============================================================
@@ -406,6 +420,406 @@ st.caption(
     "no se suman entre sí."
 )
 
+
+# ============================================================
+# TRANSFERENCIA CIENTÍFICA
+# ============================================================
+
+st.divider()
+
+st.subheader(
+    "Transferencia científica"
+)
+
+
+# Validar columnas de las tablas científicas
+columnas_publicaciones_requeridas = [
+    "ID_Articulo",
+    "Titulo",
+    "Año",
+    "Revista",
+    "DOI",
+]
+
+columnas_relaciones_requeridas = [
+    "ID_Proyecto",
+    "ID_Articulo",
+    "Tipo_Relacion",
+]
+
+
+columnas_publicaciones_ausentes = [
+    columna
+    for columna in columnas_publicaciones_requeridas
+    if columna not in publicaciones.columns
+]
+
+columnas_relaciones_ausentes = [
+    columna
+    for columna in columnas_relaciones_requeridas
+    if columna not in relaciones_publicaciones.columns
+]
+
+
+if (
+    columnas_publicaciones_ausentes
+    or columnas_relaciones_ausentes
+):
+    st.warning(
+        "No se puede construir el módulo científico "
+        "porque faltan columnas en las tablas."
+    )
+
+    if columnas_publicaciones_ausentes:
+        st.write(
+            "Columnas ausentes en TB_PUBLICACIONES:",
+            columnas_publicaciones_ausentes,
+        )
+
+    if columnas_relaciones_ausentes:
+        st.write(
+            "Columnas ausentes en "
+            "TB_PROYECTO_PUBLICACION:",
+            columnas_relaciones_ausentes,
+        )
+
+else:
+    # Conservar únicamente relaciones correspondientes
+    # a los proyectos actualmente visibles
+    relaciones_filtradas = (
+        relaciones_publicaciones.loc[
+            relaciones_publicaciones[
+                "ID_Proyecto"
+            ].isin(
+                datos_filtrados["ID_Proyecto"]
+            )
+        ]
+        .copy()
+    )
+
+
+    # Artículos asociados a los proyectos filtrados
+    identificadores_articulos_filtrados = (
+        relaciones_filtradas[
+            "ID_Articulo"
+        ]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+
+    publicaciones_filtradas = publicaciones.loc[
+        publicaciones["ID_Articulo"].isin(
+            identificadores_articulos_filtrados
+        )
+    ].copy()
+
+
+    # Indicadores científicos
+    total_articulos = publicaciones_filtradas[
+        "ID_Articulo"
+    ].nunique()
+
+    proyectos_con_publicacion = relaciones_filtradas[
+        "ID_Proyecto"
+    ].nunique()
+
+    relaciones_directas = relaciones_filtradas.loc[
+        relaciones_filtradas["Tipo_Relacion"]
+        == "Directa"
+    ].shape[0]
+
+    relaciones_sistematizacion = relaciones_filtradas.loc[
+        relaciones_filtradas["Tipo_Relacion"]
+        == "Sistematización"
+    ].shape[0]
+
+    iti_documental = (
+        proyectos_con_publicacion
+        / total_proyectos
+        if total_proyectos > 0
+        else 0
+    )
+
+
+    # Tarjetas científicas
+    cientifica_1, cientifica_2, cientifica_3, cientifica_4, cientifica_5 = (
+        st.columns(5)
+    )
+
+
+    with cientifica_1:
+        st.metric(
+            label="Artículos asociados",
+            value=total_articulos,
+        )
+
+
+    with cientifica_2:
+        st.metric(
+            label="Proyectos con publicación",
+            value=(
+                f"{proyectos_con_publicacion} "
+                f"de {total_proyectos}"
+            ),
+        )
+
+
+    with cientifica_3:
+        st.metric(
+            label="ITI documental",
+            value=f"{iti_documental:.1%}",
+        )
+
+
+    with cientifica_4:
+        st.metric(
+            label="Relaciones directas",
+            value=relaciones_directas,
+        )
+
+
+    with cientifica_5:
+        st.metric(
+            label="Sistematizaciones",
+            value=relaciones_sistematizacion,
+        )
+
+
+    st.caption(
+        "El ITI documental representa la proporción "
+        "de proyectos visibles que poseen al menos una "
+        "relación registrada con una publicación."
+    )
+
+
+    if relaciones_filtradas.empty:
+        st.info(
+            "Los proyectos seleccionados no tienen "
+            "publicaciones asociadas."
+        )
+
+    else:
+        # Incorporar nombre y producto del proyecto
+        tabla_transferencia = (
+            relaciones_filtradas.merge(
+                datos_filtrados[
+                    [
+                        "ID_Proyecto",
+                        "Nombre_Proyecto",
+                        "Periodo_Academico",
+                        "Producto_Principal",
+                    ]
+                ],
+                on="ID_Proyecto",
+                how="left",
+            )
+        )
+
+
+        # Incorporar información de la publicación
+        tabla_transferencia = (
+            tabla_transferencia.merge(
+                publicaciones[
+                    [
+                        "ID_Articulo",
+                        "Titulo",
+                        "Año",
+                        "Revista",
+                        "DOI",
+                    ]
+                ],
+                on="ID_Articulo",
+                how="left",
+            )
+        )
+
+
+        # Crear enlace web a partir del DOI
+        tabla_transferencia["Enlace_DOI"] = (
+            "https://doi.org/"
+            + tabla_transferencia[
+                "DOI"
+            ].fillna("").astype(str)
+        )
+
+
+        # Evitar enlaces inválidos en DOI vacíos
+        tabla_transferencia.loc[
+            tabla_transferencia["DOI"].isna()
+            | (
+                tabla_transferencia["DOI"]
+                .astype(str)
+                .str.strip()
+                == ""
+            ),
+            "Enlace_DOI",
+        ] = None
+
+
+        tabla_transferencia = (
+            tabla_transferencia.sort_values(
+                by=[
+                    "Año",
+                    "Titulo",
+                    "Nombre_Proyecto",
+                ],
+                ascending=[
+                    False,
+                    True,
+                    True,
+                ],
+            )
+        )
+
+
+        st.markdown(
+            "#### Trazabilidad proyecto-publicación"
+        )
+
+
+        tabla_transferencia_visible = (
+            tabla_transferencia[
+                [
+                    "ID_Proyecto",
+                    "Nombre_Proyecto",
+                    "Periodo_Academico",
+                    "Producto_Principal",
+                    "Titulo",
+                    "Año",
+                    "Revista",
+                    "Tipo_Relacion",
+                    "Enlace_DOI",
+                ]
+            ]
+            .copy()
+        )
+
+
+        tabla_transferencia_visible = (
+            tabla_transferencia_visible.fillna("-")
+        )
+
+
+        st.dataframe(
+            tabla_transferencia_visible,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "ID_Proyecto": st.column_config.TextColumn(
+                    "ID del proyecto"
+                ),
+                "Nombre_Proyecto": st.column_config.TextColumn(
+                    "Proyecto"
+                ),
+                "Periodo_Academico": st.column_config.TextColumn(
+                    "Período"
+                ),
+                "Producto_Principal": st.column_config.TextColumn(
+                    "Producto técnico"
+                ),
+                "Titulo": st.column_config.TextColumn(
+                    "Artículo"
+                ),
+                "Año": st.column_config.NumberColumn(
+                    "Año",
+                    format="%d",
+                ),
+                "Revista": st.column_config.TextColumn(
+                    "Revista"
+                ),
+                "Tipo_Relacion": st.column_config.TextColumn(
+                    "Tipo de relación"
+                ),
+                "Enlace_DOI": st.column_config.LinkColumn(
+                    "DOI",
+                    display_text="Abrir publicación",
+                ),
+            },
+        )
+
+
+        # Distribución por tipo de relación
+        relaciones_por_tipo = (
+            relaciones_filtradas.groupby(
+                "Tipo_Relacion",
+                as_index=False,
+            )
+            .size()
+            .rename(
+                columns={
+                    "size": "Numero_Relaciones"
+                }
+            )
+            .sort_values(
+                by="Numero_Relaciones",
+                ascending=True,
+            )
+        )
+
+
+        figura_relaciones = px.bar(
+            relaciones_por_tipo,
+            x="Numero_Relaciones",
+            y="Tipo_Relacion",
+            orientation="h",
+            text="Numero_Relaciones",
+            title=(
+                "Relaciones entre proyectos "
+                "y publicaciones"
+            ),
+            labels={
+                "Numero_Relaciones": (
+                    "Número de relaciones"
+                ),
+                "Tipo_Relacion": "",
+            },
+            color="Tipo_Relacion",
+        )
+
+
+        figura_relaciones.update_traces(
+            textposition="outside",
+        )
+
+
+        figura_relaciones.update_layout(
+            showlegend=False,
+            xaxis_title="Número de relaciones",
+            yaxis_title="",
+            height=max(
+                350,
+                len(relaciones_por_tipo) * 90,
+            ),
+            margin={
+                "l": 20,
+                "r": 80,
+                "t": 70,
+                "b": 20,
+            },
+        )
+
+
+        figura_relaciones.update_xaxes(
+            dtick=1,
+        )
+
+
+        st.plotly_chart(
+            figura_relaciones,
+            use_container_width=True,
+        )
+
+
+        st.caption(
+            "Una relación directa indica correspondencia "
+            "específica entre proyecto y artículo. "
+            "La sistematización representa publicaciones "
+            "que integran resultados de varios proyectos. "
+            "Las relaciones pendientes deben mantenerse "
+            "diferenciadas hasta confirmar el expediente."
+        )
 
 # ============================================================
 # GRÁFICO DE BENEFICIARIOS POR PROYECTO
