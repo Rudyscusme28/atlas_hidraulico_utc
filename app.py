@@ -294,6 +294,110 @@ with columna_3:
         ),
     )
 
+# ALCANCE SOCIAL DOCUMENTADO
+
+st.subheader(
+    "Alcance social documentado"
+)
+
+
+# Personas o habitantes
+beneficiarios_personas = datos_filtrados.loc[
+    datos_filtrados["Beneficiarios_Unidad"]
+    == "Personas/Habitantes",
+    "Beneficiarios_Valor",
+].sum(
+    min_count=1
+)
+
+
+# Usuarios
+beneficiarios_usuarios = datos_filtrados.loc[
+    datos_filtrados["Beneficiarios_Unidad"]
+    == "Usuarios",
+    "Beneficiarios_Valor",
+].sum(
+    min_count=1
+)
+
+
+# Familias
+beneficiarios_familias = datos_filtrados.loc[
+    datos_filtrados["Beneficiarios_Unidad"]
+    == "Familias",
+    "Beneficiarios_Valor",
+].sum(
+    min_count=1
+)
+
+
+# Proyectos que sí tienen un valor documentado
+proyectos_con_beneficiarios = datos_filtrados.loc[
+    datos_filtrados["Beneficiarios_Valor"].notna(),
+    "ID_Proyecto",
+].nunique()
+
+
+# Función de formato para las tarjetas
+def formatear_indicador(valor):
+    if pd.isna(valor):
+        return "-"
+
+    return f"{int(valor):,}".replace(
+        ",",
+        ".",
+    )
+
+
+# Mostrar las cuatro tarjetas
+social_columna_1, social_columna_2, social_columna_3, social_columna_4 = (
+    st.columns(4)
+)
+
+
+with social_columna_1:
+    st.metric(
+        label="Personas / habitantes",
+        value=formatear_indicador(
+            beneficiarios_personas
+        ),
+    )
+
+
+with social_columna_2:
+    st.metric(
+        label="Usuarios",
+        value=formatear_indicador(
+            beneficiarios_usuarios
+        ),
+    )
+
+
+with social_columna_3:
+    st.metric(
+        label="Familias",
+        value=formatear_indicador(
+            beneficiarios_familias
+        ),
+    )
+
+
+with social_columna_4:
+    st.metric(
+        label="Proyectos con dato social",
+        value=(
+            f"{proyectos_con_beneficiarios}"
+            f" de {total_proyectos}"
+        ),
+    )
+
+
+st.caption(
+    "Las cantidades se presentan por unidad. "
+    "Personas/habitantes, usuarios y familias "
+    "no se suman entre sí."
+)
+
 # GRÁFICO POR PERÍODO ACADÉMICO
 
 proyectos_por_periodo = (
