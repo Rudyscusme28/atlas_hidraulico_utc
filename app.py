@@ -5,7 +5,9 @@ import plotly.express as px
 import streamlit as st
 
 
+# ============================================================
 # CONFIGURACIÓN GENERAL
+# ============================================================
 
 st.set_page_config(
     page_title="Atlas Hidráulico UTC",
@@ -14,12 +16,13 @@ st.set_page_config(
 )
 
 
+# ============================================================
 # FUNCIONES AUXILIARES
-
+# ============================================================
 
 def mostrar_valor(valor):
     """
-    Devuelve un guion cuando el dato está vacío.
+    Muestra un guion cuando el dato está vacío.
 
     El símbolo "-" representa información no disponible
     y no equivale a cero.
@@ -41,8 +44,8 @@ def mostrar_valor(valor):
 
 def formatear_entero(valor):
     """
-    Presenta números enteros con punto como separador
-    de miles. Devuelve "-" cuando no existe información.
+    Formatea un número entero con punto como separador
+    de miles. Si no existe información, devuelve "-".
     """
 
     if pd.isna(valor):
@@ -51,13 +54,16 @@ def formatear_entero(valor):
     return f"{int(valor):,}".replace(",", ".")
 
 
+# ============================================================
 # RUTA DE LA BASE DE DATOS
-
+# ============================================================
 
 RUTA_EXCEL = Path("data") / "base_datos_rc.xlsx"
 
 
+# ============================================================
 # ENCABEZADO
+# ============================================================
 
 st.title(
     "Atlas Geoespacial de Vinculación "
@@ -69,7 +75,9 @@ st.caption(
 )
 
 
+# ============================================================
 # COMPROBACIÓN DEL ARCHIVO
+# ============================================================
 
 if not RUTA_EXCEL.exists():
     st.error(
@@ -86,7 +94,9 @@ if not RUTA_EXCEL.exists():
     st.stop()
 
 
+# ============================================================
 # CARGA DE LA BASE
+# ============================================================
 
 try:
     proyectos = pd.read_excel(
@@ -110,7 +120,9 @@ except Exception as error:
     st.stop()
 
 
+# ============================================================
 # VALIDACIÓN DE COLUMNAS
+# ============================================================
 
 columnas_requeridas = [
     "ID_Proyecto",
@@ -150,35 +162,30 @@ if columnas_ausentes:
 
     st.stop()
 
-# CONVERSIÓN Y VALIDACIÓN DE DATOS
 
-proyectos["Latitud"] = pd.to_numeric(
-    proyectos["Latitud"],
-    errors="coerce",
-)
+# ============================================================
+# CONVERSIÓN DE DATOS
+# ============================================================
 
-proyectos["Longitud"] = pd.to_numeric(
-    proyectos["Longitud"],
-    errors="coerce",
-)
+columnas_numericas = [
+    "Latitud",
+    "Longitud",
+    "Estudiantes",
+    "Horas_Vinculacion",
+    "Beneficiarios_Valor",
+]
 
-proyectos["Estudiantes"] = pd.to_numeric(
-    proyectos["Estudiantes"],
-    errors="coerce",
-)
-
-proyectos["Horas_Vinculacion"] = pd.to_numeric(
-    proyectos["Horas_Vinculacion"],
-    errors="coerce",
-)
-
-proyectos["Beneficiarios_Valor"] = pd.to_numeric(
-    proyectos["Beneficiarios_Valor"],
-    errors="coerce",
-)
+for columna in columnas_numericas:
+    proyectos[columna] = pd.to_numeric(
+        proyectos[columna],
+        errors="coerce",
+    )
 
 
-# Comprobar que existen 21 proyectos
+# ============================================================
+# CONTROLES DE CALIDAD
+# ============================================================
+
 if len(proyectos) != 21:
     st.warning(
         f"La base contiene {len(proyectos)} filas. "
@@ -186,7 +193,6 @@ if len(proyectos) != 21:
     )
 
 
-# Comprobar identificadores duplicados
 if proyectos["ID_Proyecto"].duplicated().any():
     identificadores_duplicados = proyectos.loc[
         proyectos["ID_Proyecto"].duplicated(
@@ -207,23 +213,24 @@ if proyectos["ID_Proyecto"].duplicated().any():
     st.stop()
 
 
-# MENSAJE DE CARGA
-
 st.success(
     f"Base cargada correctamente: "
     f"{len(proyectos)} proyectos."
 )
 
+
+# ============================================================
 # FILTROS LATERALES
+# ============================================================
 
 st.sidebar.header("Filtros de consulta")
 
 
-# Filtro por período académico
 periodos_disponibles = sorted(
     proyectos["Periodo_Academico"]
     .dropna()
     .unique()
+    .tolist()
 )
 
 periodos_seleccionados = st.sidebar.multiselect(
@@ -233,11 +240,11 @@ periodos_seleccionados = st.sidebar.multiselect(
 )
 
 
-# Filtro por línea temática
 lineas_disponibles = sorted(
     proyectos["Linea_Tematica"]
     .dropna()
     .unique()
+    .tolist()
 )
 
 lineas_seleccionadas = st.sidebar.multiselect(
@@ -247,8 +254,7 @@ lineas_seleccionadas = st.sidebar.multiselect(
 )
 
 
-# Aplicar filtros
-datos_filtrados = proyectos[
+datos_filtrados = proyectos.loc[
     proyectos["Periodo_Academico"].isin(
         periodos_seleccionados
     )
@@ -258,7 +264,6 @@ datos_filtrados = proyectos[
 ].copy()
 
 
-# Interrumpir presentación si no existen coincidencias
 if datos_filtrados.empty:
     st.warning(
         "No existen proyectos que coincidan "
@@ -267,7 +272,10 @@ if datos_filtrados.empty:
 
     st.stop()
 
+
+# ============================================================
 # INDICADORES GENERALES
+# ============================================================
 
 total_proyectos = datos_filtrados[
     "ID_Proyecto"
@@ -287,7 +295,6 @@ horas_persona = (
 ).sum()
 
 
-# Mostrar tarjetas
 columna_1, columna_2, columna_3 = st.columns(3)
 
 with columna_1:
@@ -309,20 +316,21 @@ with columna_2:
 with columna_3:
     st.metric(
         label="Horas-persona documentadas",
-        value=f"{int(horas_persona):,}".replace(
-            ",",
-            ".",
+        value=formatear_entero(
+            horas_persona
         ),
     )
 
+
+# ============================================================
 # ALCANCE SOCIAL DOCUMENTADO
+# ============================================================
 
 st.subheader(
     "Alcance social documentado"
 )
 
 
-# Personas o habitantes
 beneficiarios_personas = datos_filtrados.loc[
     datos_filtrados["Beneficiarios_Unidad"]
     == "Personas/Habitantes",
@@ -332,7 +340,6 @@ beneficiarios_personas = datos_filtrados.loc[
 )
 
 
-# Usuarios
 beneficiarios_usuarios = datos_filtrados.loc[
     datos_filtrados["Beneficiarios_Unidad"]
     == "Usuarios",
@@ -342,7 +349,6 @@ beneficiarios_usuarios = datos_filtrados.loc[
 )
 
 
-# Familias
 beneficiarios_familias = datos_filtrados.loc[
     datos_filtrados["Beneficiarios_Unidad"]
     == "Familias",
@@ -352,58 +358,39 @@ beneficiarios_familias = datos_filtrados.loc[
 )
 
 
-# Proyectos que sí tienen un valor documentado
 proyectos_con_beneficiarios = datos_filtrados.loc[
     datos_filtrados["Beneficiarios_Valor"].notna(),
     "ID_Proyecto",
 ].nunique()
 
 
-# Función de formato para las tarjetas
-def formatear_indicador(valor):
-    if pd.isna(valor):
-        return "-"
+social_1, social_2, social_3, social_4 = st.columns(4)
 
-    return f"{int(valor):,}".replace(
-        ",",
-        ".",
-    )
-
-
-# Mostrar las cuatro tarjetas
-social_columna_1, social_columna_2, social_columna_3, social_columna_4 = (
-    st.columns(4)
-)
-
-
-with social_columna_1:
+with social_1:
     st.metric(
         label="Personas / habitantes",
-        value=formatear_indicador(
+        value=formatear_entero(
             beneficiarios_personas
         ),
     )
 
-
-with social_columna_2:
+with social_2:
     st.metric(
         label="Usuarios",
-        value=formatear_indicador(
+        value=formatear_entero(
             beneficiarios_usuarios
         ),
     )
 
-
-with social_columna_3:
+with social_3:
     st.metric(
         label="Familias",
-        value=formatear_indicador(
+        value=formatear_entero(
             beneficiarios_familias
         ),
     )
 
-
-with social_columna_4:
+with social_4:
     st.metric(
         label="Proyectos con dato social",
         value=(
@@ -419,15 +406,16 @@ st.caption(
     "no se suman entre sí."
 )
 
+
+# ============================================================
 # GRÁFICO DE BENEFICIARIOS POR PROYECTO
+# ============================================================
 
 st.markdown(
     "#### Beneficiarios por proyecto"
 )
 
 
-# Obtener únicamente las unidades disponibles
-# dentro de la selección activa
 unidades_sociales = sorted(
     datos_filtrados.loc[
         datos_filtrados["Beneficiarios_Valor"].notna()
@@ -447,8 +435,6 @@ if not unidades_sociales:
     )
 
 else:
-    # Seleccionar una sola unidad para evitar
-    # comparaciones entre magnitudes incompatibles
     unidad_seleccionada = st.selectbox(
         label="Unidad de beneficiarios",
         options=unidades_sociales,
@@ -456,7 +442,6 @@ else:
     )
 
 
-    # Filtrar proyectos con la unidad seleccionada
     datos_beneficiarios = datos_filtrados.loc[
         (
             datos_filtrados["Beneficiarios_Unidad"]
@@ -468,7 +453,6 @@ else:
     ].copy()
 
 
-    # Ordenar los proyectos por cantidad
     datos_beneficiarios = (
         datos_beneficiarios.sort_values(
             by="Beneficiarios_Valor",
@@ -496,9 +480,7 @@ else:
                 f"({unidad_seleccionada})"
             ),
             labels={
-                "Beneficiarios_Valor": (
-                    unidad_seleccionada
-                ),
+                "Beneficiarios_Valor": unidad_seleccionada,
                 "Nombre_Proyecto": "Proyecto",
                 "Linea_Tematica": "Línea temática",
             },
@@ -546,7 +528,246 @@ else:
             "Los datos ausentes no se consideran cero."
         )
 
+
+# ============================================================
+# CAPACIDADES Y HERRAMIENTAS TÉCNICAS
+# ============================================================
+
+st.divider()
+
+st.subheader(
+    "Capacidades y herramientas técnicas"
+)
+
+
+herramientas_tecnicas = {
+    "Planos": "Tiene_Planos",
+    "SIG": "Tiene_SIG",
+    "Civil 3D": "Tiene_Civil3D",
+    "EPANET": "Tiene_EPANET",
+    "Modelación": "Tiene_Modelacion",
+    "Aforos": "Tiene_Aforos",
+    "Calidad del agua": "Tiene_Calidad_Agua",
+    "Topografía": "Tiene_Topografia",
+}
+
+
+columnas_herramientas_ausentes = [
+    columna
+    for columna in herramientas_tecnicas.values()
+    if columna not in datos_filtrados.columns
+]
+
+
+if columnas_herramientas_ausentes:
+    st.warning(
+        "No se pueden calcular todas las capacidades "
+        "técnicas porque faltan columnas en la base."
+    )
+
+    st.write(
+        "Columnas ausentes:",
+        columnas_herramientas_ausentes,
+    )
+
+else:
+    for columna in herramientas_tecnicas.values():
+        datos_filtrados[columna] = pd.to_numeric(
+            datos_filtrados[columna],
+            errors="coerce",
+        )
+
+
+    resumen_herramientas = []
+
+    for nombre_herramienta, columna in (
+        herramientas_tecnicas.items()
+    ):
+        cantidad_proyectos = int(
+            datos_filtrados[columna]
+            .fillna(0)
+            .eq(1)
+            .sum()
+        )
+
+        porcentaje_proyectos = (
+            cantidad_proyectos
+            / total_proyectos
+            * 100
+            if total_proyectos > 0
+            else 0
+        )
+
+        resumen_herramientas.append(
+            {
+                "Herramienta": nombre_herramienta,
+                "Proyectos": cantidad_proyectos,
+                "Porcentaje": porcentaje_proyectos,
+            }
+        )
+
+
+    resumen_herramientas = pd.DataFrame(
+        resumen_herramientas
+    )
+
+
+    # --------------------------------------------------------
+    # TARJETAS TÉCNICAS
+    # --------------------------------------------------------
+
+    fila_tecnica_1 = st.columns(4)
+    fila_tecnica_2 = st.columns(4)
+
+    nombres_herramientas = list(
+        herramientas_tecnicas.keys()
+    )
+
+    # Primera fila
+    for posicion in range(4):
+        nombre = nombres_herramientas[posicion]
+
+        registro = resumen_herramientas.loc[
+            resumen_herramientas["Herramienta"]
+            == nombre
+        ].iloc[0]
+
+        with fila_tecnica_1[posicion]:
+            st.metric(
+                label=nombre,
+                value=(
+                    f"{int(registro['Proyectos'])} "
+                    f"de {total_proyectos}"
+                ),
+                delta=(
+                    f"{registro['Porcentaje']:.1f}%"
+                ),
+                delta_color="off",
+            )
+
+
+    # Segunda fila
+    for posicion in range(4, 8):
+        nombre = nombres_herramientas[posicion]
+
+        registro = resumen_herramientas.loc[
+            resumen_herramientas["Herramienta"]
+            == nombre
+        ].iloc[0]
+
+        with fila_tecnica_2[posicion - 4]:
+            st.metric(
+                label=nombre,
+                value=(
+                    f"{int(registro['Proyectos'])} "
+                    f"de {total_proyectos}"
+                ),
+                delta=(
+                    f"{registro['Porcentaje']:.1f}%"
+                ),
+                delta_color="off",
+            )
+
+    # --------------------------------------------------------
+    # GRÁFICO DE CAPACIDADES
+    # --------------------------------------------------------
+
+    resumen_herramientas = (
+        resumen_herramientas.sort_values(
+            by="Proyectos",
+            ascending=True,
+        )
+    )
+
+
+    figura_herramientas = px.bar(
+        resumen_herramientas,
+        x="Proyectos",
+        y="Herramienta",
+        orientation="h",
+        text="Proyectos",
+        title=(
+            "Número de proyectos por capacidad "
+            "o herramienta técnica"
+        ),
+        labels={
+            "Proyectos": "Número de proyectos",
+            "Herramienta": "",
+        },
+        color="Porcentaje",
+        color_continuous_scale=[
+            "#D8F3F1",
+            "#0B7285",
+        ],
+        hover_data={
+            "Proyectos": True,
+            "Porcentaje": ":.1f",
+        },
+    )
+
+
+    figura_herramientas.update_traces(
+        textposition="outside",
+    )
+
+
+    maximo_herramientas = int(
+        resumen_herramientas[
+            "Proyectos"
+        ].max()
+    )
+
+
+    figura_herramientas.update_layout(
+        xaxis_title="Número de proyectos",
+        yaxis_title="",
+        coloraxis_colorbar={
+            "title": "Porcentaje",
+            "ticksuffix": "%",
+        },
+        height=500,
+        margin={
+            "l": 20,
+            "r": 80,
+            "t": 70,
+            "b": 20,
+        },
+    )
+
+
+    figura_herramientas.update_xaxes(
+        dtick=1,
+        range=[
+            0,
+            max(
+                maximo_herramientas + 1,
+                1,
+            ),
+        ],
+    )
+
+
+    st.plotly_chart(
+        figura_herramientas,
+        use_container_width=True,
+    )
+
+
+    st.caption(
+        "La presencia de una herramienta indica que "
+        "su uso está registrado en la documentación "
+        "del proyecto. No implica necesariamente que "
+        "el producto haya sido implementado o validado "
+        "en operación."
+    )
+
+
+# ============================================================
 # GRÁFICO POR PERÍODO ACADÉMICO
+# ============================================================
+
+st.divider()
+
 
 proyectos_por_periodo = (
     datos_filtrados.groupby(
@@ -606,19 +827,26 @@ figura_periodos.update_layout(
 )
 
 
+figura_periodos.update_yaxes(
+    dtick=1,
+)
+
+
 st.plotly_chart(
     figura_periodos,
     use_container_width=True,
 )
 
+
+# ============================================================
 # MAPA TERRITORIAL
+# ============================================================
 
 st.subheader(
     "Mapa territorial de los proyectos"
 )
 
 
-# Conservar únicamente proyectos con coordenadas
 datos_mapa = datos_filtrados.dropna(
     subset=[
         "Latitud",
@@ -627,8 +855,7 @@ datos_mapa = datos_filtrados.dropna(
 ).copy()
 
 
-# Verificar rango geográfico general
-datos_mapa = datos_mapa[
+datos_mapa = datos_mapa.loc[
     datos_mapa["Latitud"].between(
         -1.50,
         0.20,
@@ -653,7 +880,6 @@ if datos_mapa.empty:
     )
 
 else:
-    # Campo auxiliar para controlar el tamaño
     datos_mapa["Tamano_Marcador"] = 10
 
     figura_mapa = px.scatter_map(
@@ -686,11 +912,13 @@ else:
         map_style="open-street-map",
     )
 
+
     figura_mapa.update_traces(
         marker={
             "opacity": 0.90,
         }
     )
+
 
     figura_mapa.update_layout(
         legend_title_text="Línea temática",
@@ -702,10 +930,12 @@ else:
         },
     )
 
+
     st.plotly_chart(
         figura_mapa,
         use_container_width=True,
     )
+
 
     st.caption(
         "Los puntos representan ubicaciones "
@@ -715,7 +945,10 @@ else:
         "misma comunidad."
     )
 
+
+# ============================================================
 # TABLA DE PROYECTOS
+# ============================================================
 
 st.subheader(
     "Proyectos seleccionados"
@@ -740,7 +973,6 @@ tabla_proyectos = datos_filtrados[
 ].copy()
 
 
-# Mostrar guiones en la tabla sin modificar la base
 tabla_proyectos = tabla_proyectos.fillna("-")
 
 
@@ -750,7 +982,10 @@ st.dataframe(
     hide_index=True,
 )
 
+
+# ============================================================
 # FICHA INDIVIDUAL DEL PROYECTO
+# ============================================================
 
 st.divider()
 
@@ -796,12 +1031,15 @@ id_seleccionado = proyecto_seleccionado.split(
 )[0]
 
 
-ficha = datos_filtrados[
+ficha = datos_filtrados.loc[
     datos_filtrados["ID_Proyecto"]
     == id_seleccionado
 ].iloc[0]
 
-# INFORMACIÓN DE IDENTIFICACIÓN Y LOCALIZACIÓN
+
+# ============================================================
+# IDENTIFICACIÓN Y LOCALIZACIÓN
+# ============================================================
 
 ficha_columna_1, ficha_columna_2 = st.columns(2)
 
@@ -857,19 +1095,22 @@ with ficha_columna_2:
         f"{mostrar_valor(ficha['Comunidad'])}"
     )
 
+
+# ============================================================
 # INFORMACIÓN TÉCNICA Y ACADÉMICA
+# ============================================================
 
 st.markdown(
     "#### Información técnica y académica"
 )
 
 
-informacion_columna_1, informacion_columna_2, informacion_columna_3 = (
+informacion_1, informacion_2, informacion_3 = (
     st.columns(3)
 )
 
 
-with informacion_columna_1:
+with informacion_1:
     st.write(
         f"**Entidad beneficiaria:** "
         f"{mostrar_valor(ficha['Entidad_Beneficiaria'])}"
@@ -881,7 +1122,7 @@ with informacion_columna_1:
     )
 
 
-with informacion_columna_2:
+with informacion_2:
     st.write(
         f"**Estudiantes:** "
         f"{mostrar_valor(ficha['Estudiantes'])}"
@@ -893,7 +1134,7 @@ with informacion_columna_2:
     )
 
 
-with informacion_columna_3:
+with informacion_3:
     st.write(
         f"**Beneficiarios:** "
         f"{mostrar_valor(ficha['Beneficiarios_Valor'])}"
@@ -904,40 +1145,33 @@ with informacion_columna_3:
         f"{mostrar_valor(ficha['Beneficiarios_Unidad'])}"
     )
 
-# HORAS-PERSONA DEL PROYECTO SELECCIONADO
+
+# ============================================================
+# HORAS-PERSONA DEL PROYECTO
+# ============================================================
 
 if (
     pd.notna(ficha["Estudiantes"])
     and pd.notna(ficha["Horas_Vinculacion"])
 ):
-    horas_persona_proyecto = (
+    horas_persona_proyecto = int(
         ficha["Estudiantes"]
         * ficha["Horas_Vinculacion"]
-    )
-
-    horas_persona_proyecto = int(
-        horas_persona_proyecto
     )
 
 else:
     horas_persona_proyecto = None
 
 
-if horas_persona_proyecto is not None:
-    st.write(
-        f"**Horas-persona del proyecto:** "
-        f"{horas_persona_proyecto:,}".replace(
-            ",",
-            ".",
-        )
-    )
+st.write(
+    f"**Horas-persona del proyecto:** "
+    f"{formatear_entero(horas_persona_proyecto)}"
+)
 
-else:
-    st.write(
-        "**Horas-persona del proyecto:** -"
-    )
 
+# ============================================================
 # PRODUCTO PRINCIPAL
+# ============================================================
 
 st.markdown(
     "#### Producto técnico principal"
@@ -949,7 +1183,10 @@ st.info(
     )
 )
 
+
+# ============================================================
 # UBICACIÓN DEL PROYECTO SELECCIONADO
+# ============================================================
 
 st.markdown(
     "#### Ubicación del proyecto seleccionado"
@@ -974,6 +1211,7 @@ if (
         }
     )
 
+
     figura_ubicacion = px.scatter_map(
         ubicacion_seleccionada,
         lat="Latitud",
@@ -988,6 +1226,7 @@ if (
         map_style="open-street-map",
     )
 
+
     figura_ubicacion.update_traces(
         marker={
             "size": 18,
@@ -995,6 +1234,7 @@ if (
             "opacity": 0.95,
         }
     )
+
 
     figura_ubicacion.update_layout(
         showlegend=False,
@@ -1005,6 +1245,7 @@ if (
             "b": 0,
         },
     )
+
 
     st.plotly_chart(
         figura_ubicacion,
@@ -1017,7 +1258,10 @@ else:
         "de coordenadas válidas."
     )
 
+
+# ============================================================
 # NOTA METODOLÓGICA
+# ============================================================
 
 st.divider()
 
