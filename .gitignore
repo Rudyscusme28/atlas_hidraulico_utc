@@ -18,3 +18,7 @@ Thumbs.db
 
 # Configuración local de Visual Studio Code
 .vscode/
+
+# Archivos auxiliares de agentes
+.agents/
+.claude/
